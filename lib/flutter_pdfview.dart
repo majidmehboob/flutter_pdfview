@@ -31,7 +31,8 @@ class PDFView extends StatefulWidget {
     this.swipeHorizontal = false,
     this.password,
     this.nightMode = false,
-    this.autoSpacing = true,
+    this.autoSpacing = false,
+    this.pageSpacing = 0,
     this.pageFling = true,
     this.pageSnap = true,
     this.fitEachPage = true,
@@ -43,7 +44,8 @@ class PDFView extends StatefulWidget {
 
   @override
   _PDFViewState createState() => _PDFViewState();
-
+  /// my custom variable for spacing
+  final int pageSpacing;
   /// If not null invoked once the PDFView is created.
   final PDFViewCreatedCallback? onViewCreated;
 
@@ -220,6 +222,7 @@ class _PDFViewSettings {
       this.password,
       this.nightMode,
       this.autoSpacing,
+      this.pageSpacing,
       this.pageFling,
       this.pageSnap,
       this.defaultPage,
@@ -234,13 +237,14 @@ class _PDFViewSettings {
         password: widget.password,
         nightMode: widget.nightMode,
         autoSpacing: widget.autoSpacing,
+        pageSpacing: widget.pageSpacing,
         pageFling: widget.pageFling,
         pageSnap: widget.pageSnap,
         defaultPage: widget.defaultPage,
         fitPolicy: widget.fitPolicy,
         preventLinkNavigation: widget.preventLinkNavigation);
   }
-
+  final int? pageSpacing;
   final bool? enableSwipe;
   final bool? swipeHorizontal;
   final String? password;
@@ -254,6 +258,24 @@ class _PDFViewSettings {
   final bool? preventLinkNavigation;
 
   Map<String, dynamic> toMap() {
+      bool finalAutoSpacing = autoSpacing ?? false;
+    int finalPageSpacing = pageSpacing ?? 0;
+
+    // Rule 1: If pageSpacing is explicitly given and > 0 → autoSpacing must be false
+    if ((pageSpacing != null) && pageSpacing! > 0) {
+      finalAutoSpacing = false;
+      finalPageSpacing = pageSpacing!;
+    }
+    // Rule 2: If autoSpacing = true and no custom pageSpacing
+    else if (autoSpacing == true && (pageSpacing == null || pageSpacing == 0)) {
+      finalAutoSpacing = true;
+      finalPageSpacing = 0;
+    }
+    // Rule 3: If autoSpacing = false and no custom pageSpacing
+    else if (autoSpacing == false && (pageSpacing == null || pageSpacing == 0)) {
+      finalAutoSpacing = false;
+      finalPageSpacing = 0;
+    }
     return <String, dynamic>{
       'enableSwipe': enableSwipe,
       'swipeHorizontal': swipeHorizontal,
