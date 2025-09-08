@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/rendering.dart';
 
 typedef PDFViewCreatedCallback = void Function(PDFViewController controller);
 typedef RenderCallback = void Function(int? pages);
@@ -38,7 +38,6 @@ class PDFView extends StatefulWidget {
     this.defaultPage = 0,
     this.fitPolicy = FitPolicy.WIDTH,
     this.preventLinkNavigation = false,
-    this.backgroundColor,
   })  : assert(filePath != null || pdfData != null),
         super(key: key);
 
@@ -116,9 +115,6 @@ class PDFView extends StatefulWidget {
 
   /// Indicates whether or not clicking on links in the PDF document will open the link in a new page. If set to true, link navigation is prevented.
   final bool preventLinkNavigation;
-
-  /// Use to change the background color. ex : "#FF0000" => red
-  final Color? backgroundColor;
 }
 
 class _PDFViewState extends State<PDFView> {
@@ -183,13 +179,6 @@ class _PDFViewState extends State<PDFView> {
     _controller.future.then(
         (PDFViewController controller) => controller._updateWidget(widget));
   }
-
-  @override
-  void dispose() {
-    _controller.future
-        .then((PDFViewController controller) => controller.dispose());
-    super.dispose();
-  }
 }
 
 class _CreationParams {
@@ -225,34 +214,31 @@ class _CreationParams {
 }
 
 class _PDFViewSettings {
-  _PDFViewSettings({
-    this.enableSwipe,
-    this.swipeHorizontal,
-    this.password,
-    this.nightMode,
-    this.autoSpacing,
-    this.pageFling,
-    this.pageSnap,
-    this.defaultPage,
-    this.fitPolicy,
-    this.preventLinkNavigation,
-    this.backgroundColor,
-  });
+  _PDFViewSettings(
+      {this.enableSwipe,
+      this.swipeHorizontal,
+      this.password,
+      this.nightMode,
+      this.autoSpacing,
+      this.pageFling,
+      this.pageSnap,
+      this.defaultPage,
+      this.fitPolicy,
+      // this.fitEachPage,
+      this.preventLinkNavigation});
 
   static _PDFViewSettings fromWidget(PDFView widget) {
     return _PDFViewSettings(
-      enableSwipe: widget.enableSwipe,
-      swipeHorizontal: widget.swipeHorizontal,
-      password: widget.password,
-      nightMode: widget.nightMode,
-      autoSpacing: widget.autoSpacing,
-      pageFling: widget.pageFling,
-      pageSnap: widget.pageSnap,
-      defaultPage: widget.defaultPage,
-      fitPolicy: widget.fitPolicy,
-      preventLinkNavigation: widget.preventLinkNavigation,
-      backgroundColor: widget.backgroundColor,
-    );
+        enableSwipe: widget.enableSwipe,
+        swipeHorizontal: widget.swipeHorizontal,
+        password: widget.password,
+        nightMode: widget.nightMode,
+        autoSpacing: widget.autoSpacing,
+        pageFling: widget.pageFling,
+        pageSnap: widget.pageSnap,
+        defaultPage: widget.defaultPage,
+        fitPolicy: widget.fitPolicy,
+        preventLinkNavigation: widget.preventLinkNavigation);
   }
 
   final bool? enableSwipe;
@@ -264,9 +250,8 @@ class _PDFViewSettings {
   final bool? pageSnap;
   final int? defaultPage;
   final FitPolicy? fitPolicy;
+  // final bool? fitEachPage;
   final bool? preventLinkNavigation;
-
-  final Color? backgroundColor;
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
@@ -279,8 +264,8 @@ class _PDFViewSettings {
       'pageSnap': pageSnap,
       'defaultPage': defaultPage,
       'fitPolicy': fitPolicy.toString(),
-      'preventLinkNavigation': preventLinkNavigation,
-      'backgroundColor': backgroundColor?.value,
+      // 'fitEachPage': fitEachPage,
+      'preventLinkNavigation': preventLinkNavigation
     };
   }
 
@@ -305,47 +290,50 @@ class _PDFViewSettings {
 class PDFViewController {
   PDFViewController._(
     int id,
-    PDFView widget,
-  )   : _channel = MethodChannel('plugins.endigo.io/pdfview_$id'),
-        _widget = widget {
-    _settings = _PDFViewSettings.fromWidget(widget);
+    this._widget,
+  ) : _channel = MethodChannel('plugins.endigo.io/pdfview_$id') {
+    _settings = _PDFViewSettings.fromWidget(_widget);
     _channel.setMethodCallHandler(_onMethodCall);
   }
 
-  void dispose() {
-    _channel.setMethodCallHandler(null);
-    _widget = null;
-  }
-
-  MethodChannel _channel;
+  final MethodChannel _channel;
 
   late _PDFViewSettings _settings;
 
-  PDFView? _widget;
+  PDFView _widget;
 
   Future<bool?> _onMethodCall(MethodCall call) async {
-    final widget = _widget;
-    if (widget == null) return null;
-
     switch (call.method) {
       case 'onRender':
-        widget.onRender?.call(call.arguments['pages']);
+        if (_widget.onRender != null) {
+          _widget.onRender!(call.arguments['pages']);
+        }
+
         return null;
       case 'onPageChanged':
-        widget.onPageChanged?.call(
-          call.arguments['page'],
-          call.arguments['total'],
-        );
+        if (_widget.onPageChanged != null) {
+          _widget.onPageChanged!(
+              call.arguments['page'], call.arguments['total']);
+        }
+
         return null;
       case 'onError':
-        widget.onError?.call(call.arguments['error']);
+        if (_widget.onError != null) {
+          _widget.onError!(call.arguments['error']);
+        }
+
         return null;
       case 'onPageError':
-        widget.onPageError
-            ?.call(call.arguments['page'], call.arguments['error']);
+        if (_widget.onPageError != null) {
+          _widget.onPageError!(call.arguments['page'], call.arguments['error']);
+        }
+
         return null;
       case 'onLinkHandler':
-        widget.onLinkHandler?.call(call.arguments);
+        if (_widget.onLinkHandler != null) {
+          _widget.onLinkHandler!(call.arguments);
+        }
+
         return null;
     }
     throw MissingPluginException(
