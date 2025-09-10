@@ -1,8 +1,12 @@
 package io.endigo.plugins.pdfviewflutter;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.view.View;
 import android.net.Uri;
+import android.widget.FrameLayout;
+import android.util.TypedValue;
+import android.util.Log;
 
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
@@ -27,10 +31,44 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
     private final PDFView pdfView;
     private final MethodChannel methodChannel;
     private final LinkHandler linkHandler;
+    private final FrameLayout container;
 
+    private void setPaddingDp(FrameLayout container, int leftDp, int topDp, int rightDp, int bottomDp, Context context) {
+        float density = context.getResources().getDisplayMetrics().density;
+        Log.d("FlutterPDFView", "Debug message new  here");
+        Log.i("FlutterPDFView", "Info message new here");
+        Log.w("FlutterPDFView", "Warning message new here");
+        Log.e("FlutterPDFView", "Error message  new here");
+
+        int leftPx   = (int) (leftDp * density + 0.5f);
+        int topPx    = (int) (topDp * density + 0.5f);
+        int rightPx  = (int) (rightDp * density + 0.5f);
+        int bottomPx = (int) (bottomDp * density + 0.5f);
+
+        container.setPadding(leftPx, topPx, rightPx, bottomPx);
+    }
     @SuppressWarnings("unchecked")
     FlutterPDFView(Context context, BinaryMessenger messenger, int id, Map<String, Object> params) {
         pdfView = new PDFView(context, null);
+        // Outer container (with background + margin space)
+        container = new FrameLayout(context);
+        container.setBackgroundColor(0xFFF5F5F5);    // light gray background for testing
+
+// Inner wrapper for PDFView
+        FrameLayout innerWrapper = new FrameLayout(context);
+
+// ✅ Add padding in dp (acts like margin for the PDF itself)
+        setPaddingDp(innerWrapper, 4, 4, 4, 4, context);
+
+// Add pdfView inside the inner wrapper
+        innerWrapper.addView(pdfView);
+
+// Finally, add the inner wrapper into the outer container
+        container.addView(innerWrapper);
+
+        Log.d("FlutterPDFView", "Applied padding on inner wrapper by calling setPaddingDp method");
+        Log.d("_________________-------------------------------_____________________------------------);
+
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
         methodChannel = new MethodChannel(messenger, "plugins.endigo.io/pdfview_" + id);
@@ -40,12 +78,17 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
 
         Configurator config = null;
         if (params.get("filePath") != null) {
-          String filePath = (String) params.get("filePath");
-          config = pdfView.fromUri(getURI(filePath));
+            String filePath = (String) params.get("filePath");
+            config = pdfView.fromUri(getURI(filePath));
+        } else if (params.get("pdfData") != null) {
+            byte[] data = (byte[]) params.get("pdfData");
+            config = pdfView.fromBytes(data);
         }
-        else if (params.get("pdfData") != null) {
-          byte[] data = (byte[]) params.get("pdfData");
-          config = pdfView.fromBytes(data);
+
+        Object backgroundColor = params.get("backgroundColor");
+        if (backgroundColor != null) {
+            int color = ((Number) backgroundColor).intValue();
+            pdfView.setBackgroundColor(color);
         }
 
         if (config != null) {
@@ -59,9 +102,12 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                     .pageSnap(getBoolean(params, "pageSnap"))
                     .pageFitPolicy(getFitPolicy(params))
                     .enableAnnotationRendering(true)
-                    .linkHandler(linkHandler).
-                    enableAntialiasing(false)
+                    .linkHandler(linkHandler)
+                    .enableAntialiasing(false)
+                    .spacing(getInt(params, "pageSpacing"))
+                    .enableDoubletap(true)
                     // .fitEachPage(getBoolean(params,"fitEachPage"))
+                    .defaultPage(getInt(params, "defaultPage"))
                     .onPageChange(new OnPageChangeListener() {
                         @Override
                         public void onPageChanged(int page, int total) {
@@ -70,35 +116,37 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
                             args.put("total", total);
                             methodChannel.invokeMethod("onPageChanged", args);
                         }
-                    }).onError(new OnErrorListener() {
-                @Override
-                public void onError(Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onError", args);
-                }
-            }).onPageError(new OnPageErrorListener() {
-                @Override
-                public void onPageError(int page, Throwable t) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("page", page);
-                    args.put("error", t.toString());
-                    methodChannel.invokeMethod("onPageError", args);
-                }
-            }).onRender(new OnRenderListener() {
-                @Override
-                public void onInitiallyRendered(int pages) {
-                    Map<String, Object> args = new HashMap<>();
-                    args.put("pages", pages);
-                    methodChannel.invokeMethod("onRender", args);
-                }
-            }).enableDoubletap(true).defaultPage(getInt(params, "defaultPage")).load();
+                    })
+                    .onError(new OnErrorListener() {
+                        @Override
+                        public void onError(Throwable t) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("error", t.toString());
+                            methodChannel.invokeMethod("onError", args);
+                        }
+                    }).onPageError(new OnPageErrorListener() {
+                        @Override
+                        public void onPageError(int page, Throwable t) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("page", page);
+                            args.put("error", t.toString());
+                            methodChannel.invokeMethod("onPageError", args);
+                        }
+                    }).onRender(new OnRenderListener() {
+                        @Override
+                        public void onInitiallyRendered(int pages) {
+                            Map<String, Object> args = new HashMap<>();
+                            args.put("pages", pages);
+                            methodChannel.invokeMethod("onRender", args);
+                        }
+                    })
+                    .load();
         }
     }
 
     @Override
     public View getView() {
-        return pdfView;
+        return container;
     }
 
     @Override
@@ -175,19 +223,19 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         methodChannel.setMethodCallHandler(null);
     }
 
-    boolean getBoolean(Map<String, Object> params, String key) {
+    private boolean getBoolean(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (boolean) params.get(key) : false;
     }
 
-    String getString(Map<String, Object> params, String key) {
+    private String getString(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (String) params.get(key) : "";
     }
 
-    int getInt(Map<String, Object> params, String key) {
+    private int getInt(Map<String, Object> params, String key) {
         return params.containsKey(key) ? (int) params.get(key) : 0;
     }
 
-    FitPolicy getFitPolicy(Map<String, Object> params) {
+    private FitPolicy getFitPolicy(Map<String, Object> params) {
         String fitPolicy = getString(params, "fitPolicy");
         switch (fitPolicy) {
             case "FitPolicy.WIDTH":
