@@ -67,7 +67,7 @@ public class FlutterPDFView implements PlatformView, MethodCallHandler {
         container.addView(innerWrapper);
 
         Log.d("FlutterPDFView", "Applied padding on inner wrapper by calling setPaddingDp method");
-        Log.d("_________________-------------------------------_____________________------------------);
+        Log.d("see the diffr","-------------------------------------------------");
 
         final boolean preventLinkNavigation = getBoolean(params, "preventLinkNavigation");
 
